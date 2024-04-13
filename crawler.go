@@ -67,15 +67,17 @@ func (c *Crawler) Crawl() {
 			fmt.Println(errMsg)
 		}
 
-		links := c.getLinks(doc, c.startingUrl)
-		for _, link := range links {
-			successLink, err := c.processLink(link, sourceUrl)
-			if err != nil {
-				fmt.Println("🚨 " + err.Error())
-				continue
+		if doc != nil {
+			links := c.getLinks(doc, c.startingUrl)
+			for _, link := range links {
+				successLink, err := c.processLink(link, sourceUrl)
+				if err != nil {
+					fmt.Println("🚨 " + err.Error())
+					continue
+				}
+				fmt.Printf("✅ added %s to the queue\n", successLink)
+				c.queue.Enqueue(successLink)
 			}
-			fmt.Printf("✅ added %s to the queue\n", successLink)
-			c.queue.Enqueue(successLink)
 		}
 
 		c.visited.Enqueue(u)
