@@ -70,13 +70,13 @@ func (c *Crawler) Crawl() {
 		if doc != nil {
 			links := c.getLinks(doc, c.startingUrl)
 			for _, link := range links {
-				successLink, err := c.processLink(link, sourceUrl)
+				err := c.processLink(link, sourceUrl)
 				if err != nil {
 					fmt.Println("🚨 " + err.Error())
 					continue
 				}
-				fmt.Printf("✅ added %s to the queue\n", successLink)
-				c.queue.Enqueue(successLink)
+				fmt.Printf("✅ added %s to the queue\n", link)
+				c.queue.Enqueue(link)
 			}
 		}
 
@@ -88,38 +88,32 @@ func (c *Crawler) Crawl() {
 	}
 }
 
-func (c *Crawler) processLink(link string, sourceUrl *url.URL) (string, error) {
+func (c *Crawler) processLink(link string, sourceUrl *url.URL) error {
 	if link == "" {
-		err := fmt.Errorf("link cannot be empty")
-		return "", err
+		return fmt.Errorf("link cannot be empty")
 	}
 
 	if c.queue.Contains(link) {
-		err := fmt.Errorf("link %s already in queue", link)
-		return "", err
+		return fmt.Errorf("link %s already in queue", link)
 	}
 
 	if c.visited.Contains(link) {
 		err := fmt.Errorf("link %s already visited", link)
-		return "", err
+		return err
 	}
 
-	parsedUrlForLink, err := c.parseUrl(link)
-
-	if err != nil {
-		errMsg := fmt.Errorf("error parsing url %s: %s", link, err)
-		return "", errMsg
+	parsedUrlForLink, parseErr := c.parseUrl(link)
+	if parseErr != nil {
+		return fmt.Errorf("error parsing url %s: %s", link, parseErr)
 	}
 
 	if (sourceUrl.Host == parsedUrlForLink.Host) && (sourceUrl.Path == parsedUrlForLink.Path) {
-		err := fmt.Errorf("link %s is the same as the source url", link)
-		return "", err
+		return fmt.Errorf("link %s is the same as the source url", link)
 	}
 
 	if parsedUrlForLink.Host != sourceUrl.Host {
-		err := fmt.Errorf("link %s is not in the same domain", link)
-		return "", err
+		return fmt.Errorf("link %s is not in the same domain", link)
 	}
 
-	return link, nil
+	return nil
 }
