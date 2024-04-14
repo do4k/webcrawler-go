@@ -1,27 +1,29 @@
 package http
 
 import (
+	"fmt"
+	"io"
 	"net/http"
-
-	"golang.org/x/net/html"
 )
 
-const UserAgent = "DanOakBot/1.0"
-
-func GetContent(url string) (*html.Node, error) {
+func GetContent(url, userAgent string) (string, error) {
 	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("User-Agent", UserAgent)
+	req.Header.Add("User-Agent", userAgent)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	doc, err := html.Parse(resp.Body)
-	if err != nil {
-		return nil, err
+	if (resp.StatusCode < 200) || (resp.StatusCode >= 300) {
+		return "", fmt.Errorf("status code %d does not indicate success", resp.StatusCode)
 	}
 
-	return doc, nil
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }

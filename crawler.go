@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dandecrypted/webcrawler-go/data"
+	"github.com/temoto/robotstxt"
 	"golang.org/x/net/html"
 )
 
@@ -13,27 +14,51 @@ type Crawler struct {
 	startingUrl    string
 	visited        data.Queue
 	queue          data.Queue
-	throttle       int
+	throttle       time.Duration
+	robotsTxt      *robotstxt.RobotsData
 	parseUrl       func(string) (*url.URL, error)
-	getHttpContent func(string) (*html.Node, error)
+	getHttpContent func(string) (string, error)
+	parseHtml      func(string) (*html.Node, error)
 	getLinks       func(*html.Node, string) []string
+	robotsAllowed  func(string, *robotstxt.RobotsData) bool
 }
 
 func NewCrawler(
 	startingUrl string,
 	throttle int,
 	parseUrl func(string) (*url.URL, error),
-	getHttpContent func(string) (*html.Node, error),
-	getLinks func(*html.Node, string) []string) *Crawler {
+	getHttpContent func(string) (string, error),
+	parseHtml func(string) (*html.Node, error),
+	getLinks func(*html.Node, string) []string,
+	robotsAllowed func(string, *robotstxt.RobotsData) bool) *Crawler {
+
+	parsedStartingUrl, err := parseUrl(startingUrl)
+	if err != nil {
+		fmt.Println("🚨 error parsing starting url " + err.Error())
+		return nil
+	}
+
+	robotsTxtContent, err := getHttpContent(parsedStartingUrl.Scheme + "://" + parsedStartingUrl.Host + "/robots.txt")
+	if err != nil {
+		fmt.Println("🚨 error fetching robots.txt " + err.Error())
+	}
+
+	robots, err := robotstxt.FromBytes([]byte(robotsTxtContent))
+	if err != nil {
+		fmt.Println("🚨 error parsing robots.txt " + err.Error())
+	}
 
 	return &Crawler{
 		startingUrl:    startingUrl,
 		visited:        data.Queue{},
 		queue:          data.Queue{startingUrl},
-		throttle:       throttle,
+		throttle:       time.Duration(throttle) * time.Second,
 		parseUrl:       parseUrl,
+		robotsTxt:      robots,
 		getHttpContent: getHttpContent,
+		parseHtml:      parseHtml,
 		getLinks:       getLinks,
+		robotsAllowed:  robotsAllowed,
 	}
 }
 
@@ -41,36 +66,51 @@ func (c *Crawler) Crawl() {
 	hasItems := true
 
 	for hasItems {
-		u, hasItems := c.queue.Dequeue()
+		deqeuedUrl, hasItems := c.queue.Dequeue()
 		if !hasItems {
 			break
 		}
 
-		sourceUrl, err := c.parseUrl(u)
+		currentUrl, err := c.parseUrl(deqeuedUrl)
 		if err != nil {
-			errMsg := fmt.Errorf("error parsing url %s: %s", u, err)
+			errMsg := fmt.Errorf("🚨 error parsing url %s %s", deqeuedUrl, err)
 			fmt.Println(errMsg)
 			continue
 		}
 
-		fmt.Printf("-----\ncrawling %s\n-----\n", sourceUrl)
+		fmt.Printf("-----\ncrawling %s (%d items in the queue)\n-----\n", currentUrl, c.queue.Count())
 
-		if sourceUrl.String() == "" {
-			errMsg := fmt.Errorf("url cannot be empty")
+		if currentUrl.String() == "" {
+			errMsg := fmt.Errorf("🚨 url cannot be empty")
 			fmt.Println(errMsg)
 			continue
 		}
 
-		doc, err := c.getHttpContent(u)
-		if err != nil {
-			errMsg := fmt.Errorf("error crawling %s: %s", u, err)
+		if !c.robotsAllowed(deqeuedUrl, c.robotsTxt) {
+			errMsg := fmt.Errorf("🚨 url %s is disallowed by robots.txt", currentUrl)
 			fmt.Println(errMsg)
+			continue
+		}
+
+		content, err := c.getHttpContent(deqeuedUrl)
+		if err != nil {
+			errMsg := fmt.Errorf("🚨 error fetching content for %s %s", deqeuedUrl, err)
+			fmt.Println(errMsg)
+			continue
+		}
+
+		doc, err := c.parseHtml(content)
+		if err != nil {
+			errMsg := fmt.Errorf("🚨 error parsing html for %s %s", deqeuedUrl, err)
+			fmt.Println(errMsg)
+			c.sleep()
+			continue
 		}
 
 		if doc != nil {
 			links := c.getLinks(doc, c.startingUrl)
 			for _, link := range links {
-				err := c.processLink(link, sourceUrl)
+				err := c.processLink(link, currentUrl)
 				if err != nil {
 					fmt.Println("🚨 " + err.Error())
 					continue
@@ -80,26 +120,22 @@ func (c *Crawler) Crawl() {
 			}
 		}
 
-		c.visited.Enqueue(u)
-		if c.queue.Count() > 0 {
-			fmt.Printf("sleeping for %d seconds\n", c.throttle)
-			time.Sleep(time.Duration(c.throttle) * time.Second)
-		}
+		c.visited.Enqueue(deqeuedUrl)
+		c.sleep()
+	}
+}
+
+// this is to be a good citizen and not spam the target server
+func (c *Crawler) sleep() {
+	if c.queue.Count() > 0 {
+		fmt.Printf("sleeping for %d seconds %d items in the queue\n", int(c.throttle.Seconds()), c.queue.Count())
+		time.Sleep(c.throttle)
 	}
 }
 
 func (c *Crawler) processLink(link string, sourceUrl *url.URL) error {
 	if link == "" {
 		return fmt.Errorf("link cannot be empty")
-	}
-
-	if c.queue.Contains(link) {
-		return fmt.Errorf("link %s already in queue", link)
-	}
-
-	if c.visited.Contains(link) {
-		err := fmt.Errorf("link %s already visited", link)
-		return err
 	}
 
 	parsedUrlForLink, parseErr := c.parseUrl(link)
@@ -113,6 +149,19 @@ func (c *Crawler) processLink(link string, sourceUrl *url.URL) error {
 
 	if parsedUrlForLink.Host != sourceUrl.Host {
 		return fmt.Errorf("link %s is not in the same domain", link)
+	}
+
+	if c.queue.Contains(link) {
+		return fmt.Errorf("link %s already in queue", link)
+	}
+
+	if c.visited.Contains(link) {
+		err := fmt.Errorf("link %s already visited", link)
+		return err
+	}
+
+	if !c.robotsAllowed(link, c.robotsTxt) {
+		return fmt.Errorf("link %s is disallowed by robots.txt", link)
 	}
 
 	return nil

@@ -24,6 +24,12 @@ func TestNormaliseLink(t *testing.T) {
 			want:        "http://example.com/test",
 		},
 		{
+			name:        "Test relative link starting with period forward slash",
+			link:        "./test",
+			baseAddress: "http://example.com",
+			want:        "http://example.com/test",
+		},
+		{
 			name:        "Test with link containing query params",
 			link:        "http://example.com/test?param=value",
 			baseAddress: "",
@@ -41,12 +47,18 @@ func TestNormaliseLink(t *testing.T) {
 			baseAddress: "",
 			want:        "http://example.com/test",
 		},
+		{
+			name:        "baseAddress and link have no forward slashes",
+			link:        "test",
+			baseAddress: "example.com",
+			want:        "example.com/test",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NormaliseLink(tt.link, tt.baseAddress); got != tt.want {
-				t.Errorf("NormaliseLink() = %v, want %v", got, tt.want)
+				t.Errorf("Expected %v got %v", tt.want, got)
 			}
 		})
 	}

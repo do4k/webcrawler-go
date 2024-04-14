@@ -5,20 +5,24 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"sync"
+	"strings"
 
 	"github.com/dandecrypted/webcrawler-go/html"
 	"github.com/dandecrypted/webcrawler-go/http"
+	"github.com/temoto/robotstxt"
+	xhtml "golang.org/x/net/html"
 )
+
+const UserAgent = "DanOakBot/1.0"
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: go run main.go <url> <optional: throttle>")
+		fmt.Println("usage: go run main.go \"<your url (string)>\" <optional: throttle (int)>")
 		os.Exit(1)
 	}
 
-	baseAddress := html.NormaliseLink(os.Args[1], "")
-	_, err := url.Parse(baseAddress)
+	startUrl := html.NormaliseLink(os.Args[1], "")
+	_, err := url.Parse(startUrl)
 	if err != nil {
 		fmt.Println("error parsing url: " + err.Error())
 		os.Exit(1)
@@ -34,21 +38,30 @@ func main() {
 		}
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	c := NewCrawler(
-		baseAddress,
+		startUrl,
 		throttle,
 		url.Parse,
-		http.GetContent,
+		func(currentUrl string) (string, error) {
+			return http.GetContent(currentUrl, UserAgent)
+		},
+		func(content string) (*xhtml.Node, error) {
+			return xhtml.Parse(strings.NewReader(content))
+		},
 		html.GetLinks,
+		func(url string, robots *robotstxt.RobotsData) bool {
+			if robots == nil {
+				return true
+			}
+
+			return robots.TestAgent(url, UserAgent)
+		},
 	)
 
-	go func() {
-		c.Crawl()
-		wg.Done()
-	}()
+	c.Crawl()
 
-	wg.Wait()
+	fmt.Println("Visited links for ", startUrl)
+	for _, link := range c.visited {
+		fmt.Println(link)
+	}
 }
