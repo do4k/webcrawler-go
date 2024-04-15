@@ -53,6 +53,12 @@ func TestNormaliseLink(t *testing.T) {
 			baseAddress: "example.com",
 			want:        "example.com/test",
 		},
+		{
+			name:        "link has two forward slashes at the start",
+			link:        "//test",
+			baseAddress: "https://example.com",
+			want:        "https://example.com/test",
+		},
 	}
 
 	for _, tt := range tests {
