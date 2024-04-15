@@ -1,11 +1,22 @@
 package html
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 func NormaliseLink(link, baseAddress string) string {
 	link = strings.TrimSpace(link)
 	if len(link) == 0 {
 		return ""
+	}
+
+	if strings.HasPrefix(link, "//") {
+		parsed, err := url.Parse(link)
+		if err != nil {
+			return parsed.Scheme + ":" + link
+		}
+		return "https:" + link
 	}
 
 	// I'm aware this doesn't account for ../ links and I was hoping that a nice URL library would handle that case
