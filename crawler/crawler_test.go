@@ -1,4 +1,4 @@
-package main
+package crawler
 
 import (
 	"errors"
@@ -33,8 +33,8 @@ func TestCrawl(t *testing.T) {
 	c := NewCrawler("http://test.com", 1, defaultParseUrl, defaultGetHttpContent, defaultParseHtml, defaultGetLinks, defaultRobotsTxtAllowed)
 	c.Crawl()
 
-	if len(c.visited) != 3 {
-		t.Errorf("Expected visited to have 3 items, got %d", len(c.visited))
+	if len(c.Visited) != 3 {
+		t.Errorf("Expected Visited to have 3 items, got %d", len(c.Visited))
 	}
 }
 
@@ -50,12 +50,12 @@ func TestCrawl_FailsToParseSecondUrl(t *testing.T) {
 	c := NewCrawler("http://test.com", 1, parseUrl, defaultGetHttpContent, defaultParseHtml, defaultGetLinks, defaultRobotsTxtAllowed)
 	c.Crawl()
 
-	if len(c.visited) != 2 {
-		t.Errorf("Expected visited to have 2 items, got %d", len(c.visited))
+	if len(c.Visited) != 2 {
+		t.Errorf("Expected Visited to have 2 items, got %d", len(c.Visited))
 	}
 
-	if (c.visited[0] != "http://test.com") || (c.visited[1] != "http://test.com/link2") {
-		t.Errorf("Expected visited to contain 'http://test.com' and 'http://test.com/link2'")
+	if (c.Visited[0] != "http://test.com") || (c.Visited[1] != "http://test.com/link2") {
+		t.Errorf("Expected Visited to contain 'http://test.com' and 'http://test.com/link2'")
 	}
 }
 
@@ -66,12 +66,12 @@ func TestCrawl_RobotsTxtDisallowed(t *testing.T) {
 
 	c.Crawl()
 
-	if len(c.visited) != 2 {
-		t.Errorf("Expected visited to have 2 items, got %d", len(c.visited))
+	if len(c.Visited) != 2 {
+		t.Errorf("Expected Visited to have 2 items, got %d", len(c.Visited))
 	}
 
-	if (c.visited[0] != "http://test.com") || (c.visited[1] != "http://test.com/link2") {
-		t.Errorf("Expected visited to contain 'http://test.com' and 'http://test.com/link2'")
+	if (c.Visited[0] != "http://test.com") || (c.Visited[1] != "http://test.com/link2") {
+		t.Errorf("Expected Visited to contain 'http://test.com' and 'http://test.com/link2'")
 	}
 }
 
@@ -83,8 +83,8 @@ func TestCrawl_DuplicateLinksOnlyVisitedOnce(t *testing.T) {
 	c := NewCrawler("http://test.com", 1, defaultParseUrl, defaultGetHttpContent, defaultParseHtml, getLinks, defaultRobotsTxtAllowed)
 	c.Crawl()
 
-	if len(c.visited) != 2 {
-		t.Errorf("Expected visited to have 2 items, got %d", len(c.visited))
+	if len(c.Visited) != 2 {
+		t.Errorf("Expected Visited to have 2 items, got %d", len(c.Visited))
 	}
 }
 
@@ -96,7 +96,7 @@ func TestCrawl_LinkIsSameAsSource(t *testing.T) {
 	c := NewCrawler("http://test.com", 1, defaultParseUrl, defaultGetHttpContent, defaultParseHtml, getLinks, defaultRobotsTxtAllowed)
 	c.Crawl()
 
-	if len(c.visited) != 1 {
-		t.Errorf("Expected visited to have 1 item, got %d", len(c.visited))
+	if len(c.Visited) != 1 {
+		t.Errorf("Expected Visited to have 1 item, got %d", len(c.Visited))
 	}
 }

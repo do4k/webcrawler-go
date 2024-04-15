@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dandecrypted/webcrawler-go/crawler"
 	"github.com/dandecrypted/webcrawler-go/html"
 	"github.com/dandecrypted/webcrawler-go/http"
 	"github.com/temoto/robotstxt"
@@ -20,25 +21,20 @@ func main() {
 		fmt.Println("usage: go run main.go \"<your url (string)>\" <optional: throttle (int)>")
 		os.Exit(1)
 	}
-
-	startUrl := html.NormaliseLink(os.Args[1], "")
-	_, err := url.Parse(startUrl)
-	if err != nil {
-		fmt.Println("error parsing url: " + err.Error())
-		os.Exit(1)
-	}
+	startUrl := os.Args[1]
 
 	throttle := 20
 	if len(os.Args) == 3 {
 		throttleStr := os.Args[2]
-		throttle, err = strconv.Atoi(throttleStr)
+		parsedThrottle, err := strconv.Atoi(throttleStr)
 		if err != nil {
-			fmt.Println("error parsing throttle value: " + err.Error())
+			fmt.Println("🚨 error parsing throttle value: " + err.Error())
 			os.Exit(1)
 		}
+		throttle = parsedThrottle
 	}
 
-	c := NewCrawler(
+	c := crawler.NewCrawler(
 		startUrl,
 		throttle,
 		url.Parse,
@@ -60,8 +56,8 @@ func main() {
 
 	c.Crawl()
 
-	fmt.Println("Visited links for ", startUrl)
-	for _, link := range c.visited {
-		fmt.Println(link)
+	fmt.Println("📃 visited links for", startUrl)
+	for _, link := range c.Visited {
+		fmt.Printf("✈️  %s\n", link)
 	}
 }

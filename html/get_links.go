@@ -1,6 +1,7 @@
 package html
 
 import (
+	"github.com/dandecrypted/webcrawler-go/http"
 	"github.com/dandecrypted/webcrawler-go/strings"
 	"golang.org/x/net/html"
 )
@@ -12,7 +13,7 @@ func GetLinks(n *html.Node, sourceAddress string) []string {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for _, a := range n.Attr {
 			if a.Key == "href" && !strings.StartsWithAny(ignorePrefixes, a.Val) {
-				links = append(links, NormaliseLink(a.Val, sourceAddress))
+				links = append(links, http.NormaliseLink(a.Val, sourceAddress))
 			}
 		}
 	}

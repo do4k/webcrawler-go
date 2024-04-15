@@ -1,18 +1,20 @@
-package main
+package crawler
 
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/dandecrypted/webcrawler-go/data"
+	"github.com/dandecrypted/webcrawler-go/http"
 	"github.com/temoto/robotstxt"
 	"golang.org/x/net/html"
 )
 
 type Crawler struct {
+	Visited        data.Queue
 	startingUrl    string
-	visited        data.Queue
 	queue          data.Queue
 	throttle       time.Duration
 	robotsTxt      *robotstxt.RobotsData
@@ -32,6 +34,12 @@ func NewCrawler(
 	getLinks func(*html.Node, string) []string,
 	robotsAllowed func(string, *robotstxt.RobotsData) bool) *Crawler {
 
+	if !(strings.HasPrefix(startingUrl, "http://") || strings.HasPrefix(startingUrl, "https://")) {
+		startingUrl = "https://" + startingUrl
+	}
+
+	startingUrl = http.NormaliseLink(startingUrl, "")
+
 	parsedStartingUrl, err := parseUrl(startingUrl)
 	if err != nil {
 		fmt.Println("🚨 error parsing starting url " + err.Error())
@@ -49,8 +57,8 @@ func NewCrawler(
 	}
 
 	return &Crawler{
+		Visited:        data.Queue{},
 		startingUrl:    startingUrl,
-		visited:        data.Queue{},
 		queue:          data.Queue{startingUrl},
 		throttle:       time.Duration(throttle) * time.Second,
 		parseUrl:       parseUrl,
@@ -78,7 +86,7 @@ func (c *Crawler) Crawl() {
 			continue
 		}
 
-		fmt.Printf("-----\ncrawling %s (%d items in the queue)\n-----\n", currentUrl, c.queue.Count())
+		fmt.Printf("-----\n🕸️  crawling 👉 %s 👈 (%d items in the queue)\n-----\n", currentUrl, c.queue.Count())
 
 		if currentUrl.String() == "" {
 			errMsg := fmt.Errorf("🚨 url cannot be empty")
@@ -120,7 +128,7 @@ func (c *Crawler) Crawl() {
 			}
 		}
 
-		c.visited.Enqueue(deqeuedUrl)
+		c.Visited.Enqueue(deqeuedUrl)
 		c.sleep()
 	}
 }
@@ -155,7 +163,7 @@ func (c *Crawler) processLink(link string, sourceUrl *url.URL) error {
 		return fmt.Errorf("link %s already in queue", link)
 	}
 
-	if c.visited.Contains(link) {
+	if c.Visited.Contains(link) {
 		err := fmt.Errorf("link %s already visited", link)
 		return err
 	}
